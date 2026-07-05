@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Toll-Finder テストチェックリスト</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 860px; margin: 40px auto; padding: 0 24px; color: #1a1a1a; }
+  h1 { font-size: 24px; border-bottom: 3px solid #2f4338; padding-bottom: 10px; color: #2f4338; }
+  .meta { color: #666; font-size: 14px; margin-bottom: 32px; }
+  h2 { font-size: 16px; background: #2f4338; color: #fff; padding: 8px 14px; margin-top: 32px; border-radius: 2px; }
+  h3 { font-size: 14px; color: #2f4338; margin: 20px 0 8px; border-left: 4px solid #c4683f; padding-left: 10px; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; font-size: 14px; line-height: 1.5; border-bottom: 1px solid #f0ece4; }
+  li:last-child { border-bottom: none; }
+  input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; width: 16px; height: 16px; accent-color: #2f4338; }
+  .indent { padding-left: 26px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 12px 0; }
+  th { background: #f0ece4; padding: 8px 12px; text-align: left; border: 1px solid #d8d2c4; }
+  td { padding: 7px 12px; border: 1px solid #d8d2c4; vertical-align: top; }
+  td.center { text-align: center; }
+  .note { background: #fffdf8; border: 1px solid #d8d2c4; border-left: 4px solid #c4683f; padding: 10px 14px; font-size: 13px; margin: 10px 0; color: #555; }
+  .memo { border: 1px solid #d8d2c4; min-height: 100px; padding: 12px; margin-top: 8px; font-size: 14px; color: #aaa; }
+  .tag-important { background: #c4683f; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: bold; margin-left: 6px; vertical-align: middle; }
+  .date-row { display: flex; gap: 40px; margin-bottom: 24px; font-size: 14px; }
+  .date-row span { border-bottom: 1px solid #999; min-width: 200px; display: inline-block; padding-bottom: 2px; }
+</style>
+</head>
+<body>
+
+<h1>🛣 Toll-Finder アプリ テストチェックリスト</h1>
+<div class="meta">
+  <div class="date-row">
+    <div>テスト日：<span>&nbsp;</span></div>
+    <div>担当者：<span>&nbsp;</span></div>
+  </div>
+</div>
+
+<!-- ─── Section 1 ─── -->
+<h2>1　起動・設定確認</h2>
+<ul>
+  <li><input type="checkbox"> フォルダ <code>C:\Users\pichb\work\Coding\toll-finder</code> で <code>npm start</code> を実行する</li>
+  <li><input type="checkbox"> ターミナルに <strong>「toll-finder running at http://localhost:3000」</strong> と表示される</li>
+  <li><input type="checkbox"> ブラウザで <code>http://localhost:3000</code> を開く — ページが正常に読み込まれる</li>
+  <li><input type="checkbox"> F12 DevTools → Console タブ にエラーが出ていないことを確認</li>
+  <li><input type="checkbox"> 出発地フィールドに会社住所（長岡京）が自動入力されている</li>
+</ul>
+
+<!-- ─── Section 2 ─── -->
+<h2>2　ルート検索（基本動作）</h2>
+
+<h3>高速道路あり — 目的地: 東京駅</h3>
+<ul>
+  <li><input type="checkbox"> 地図にルートの青い線が表示される</li>
+  <li><input type="checkbox"> 高速 入口IC に名前が表示される（例: 大山崎IC・長岡京IC）</li>
+  <li><input type="checkbox"> 高速 出口IC に名前が表示される（例: 東京IC・首都高出口）</li>
+  <li><input type="checkbox"> 距離 に妥当な数値が表示される（目安: 450〜550 km）</li>
+  <li><input type="checkbox"> 所要時間 に妥当な時間が表示される（目安: 4〜5 時間）</li>
+  <li><input type="checkbox"> ETC料金 に ¥ 金額がオレンジ色で表示される</li>
+  <li><input type="checkbox"> 経由 に高速道路名のチップが表示される（名神・新東名など）</li>
+</ul>
+
+<h3>高速道路なし — 出発地: 長岡京市　目的地: 向日市</h3>
+<ul>
+  <li><input type="checkbox"> ETC料金: 「高速道路なし（無料）」と表示される</li>
+  <li><input type="checkbox"> 入口IC / 出口IC: 「検出できませんでした」と表示される</li>
+</ul>
+
+<h3>📍 位置情報ボタン</h3>
+<ul>
+  <li><input type="checkbox"> 📍 をクリック → ブラウザが位置情報の許可を求める</li>
+  <li><input type="checkbox"> 許可後、フィールドに現在地の住所が自動入力される</li>
+</ul>
+
+<h3>エラー処理</h3>
+<ul>
+  <li><input type="checkbox"> 目的地に「aaaaaaaaa」などの無効な住所を入力 → 赤いエラーメッセージが表示される（クラッシュしない）</li>
+  <li><input type="checkbox"> 出発地を空にして検索 → 「出発地を入力してください」のエラーが表示される</li>
+</ul>
+
+<!-- ─── Section 3 ─── -->
+<h2>3　ドキュメントスキャン — ファイルアップロード</h2>
+
+<h3>ドロップゾーン UI</h3>
+<ul>
+  <li><input type="checkbox"> 目的地フィールドの下にドロップゾーンが表示されている</li>
+  <li><input type="checkbox"> ファイルをドラッグしてゾーン上に乗せると枠が緑色に変わる</li>
+  <li><input type="checkbox"> ドラッグしてゾーンから離すと枠が元に戻る</li>
+  <li><input type="checkbox"> 「ファイルを選択」リンクをクリック → ファイルピッカーが開く（PDF / DOCX / TXT 対応）</li>
+  <li><input type="checkbox"> ドロップゾーン全体をクリック → ファイルピッカーが開く</li>
+</ul>
+
+<h3>座標フォーマット別テスト（.txt ファイルを作成してアップロード）</h3>
+<div class="note">以下の各フォーマットをテキストファイルに書き込んで1件ずつテストするか、全行を1ファイルに入れてまとめてテストする。</div>
+
+<table>
+  <tr>
+    <th>テスト内容</th>
+    <th>フォーマット</th>
+    <th>合否</th>
+  </tr>
+  <tr>
+    <td><code>緯度: 34.9153, 経度: 135.6865</code></td>
+    <td>ラベル付き小数</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>北緯35度41分22秒 東経139度41分30秒</code></td>
+    <td>日本語 DMS</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>35°41'22"N 139°41'30"E</code></td>
+    <td>英語 DMS</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>35.6580N, 139.7016E</code></td>
+    <td>方位付き小数</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>34.6785, 135.8324</code></td>
+    <td>通常の小数ペア</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>３５．６８９５，１３９．６９１７</code>（全角数字）</td>
+    <td>全角→半角変換（NFKC）</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+</table>
+
+<h3>ファイル形式テスト</h3>
+<ul>
+  <li><input type="checkbox"> <strong>.txt</strong> ファイルをドロップ → 座標が検出される</li>
+  <li><input type="checkbox"> <strong>.docx</strong> ファイルをドロップ → 座標が検出される（実際の現場資料推奨）</li>
+  <li><input type="checkbox"> <strong>.pdf</strong> ファイルをドロップ → 座標が検出される（実際の現場資料推奨）</li>
+</ul>
+
+<h3>結果表示</h3>
+<ul>
+  <li><input type="checkbox"> アップロード後に座標ピッカーが表示される（ファイル名 ＋ 件数）</li>
+  <li><input type="checkbox"> 各カードに 緯度・経度 と 前後の文脈テキスト が表示される</li>
+  <li><input type="checkbox"> 座標が含まれないファイルをアップロード → 「座標が見つかりませんでした」と表示される</li>
+</ul>
+
+<!-- ─── Section 4 ─── -->
+<h2>4　座標選択 → ルート検索（統合テスト）<span class="tag-important">最重要</span></h2>
+
+<div class="note">座標を含むファイルをアップロードしてから以下の順番でテストする。</div>
+<ul>
+  <li><input type="checkbox"> 座標カードをクリック → 目的地フィールドに「35.xxxxx, 139.xxxxx」が入力される</li>
+  <li><input type="checkbox"> クリックしたカードに緑のハイライトが付く</li>
+  <li><input type="checkbox"> ルート検索をクリック → ルートが正常に計算される（ジオコーディングをスキップして直接座標を使用）</li>
+  <li><input type="checkbox"> 地図と結果カード（IC名・距離・時間・ETC料金）が正常に表示される</li>
+</ul>
+
+<h3>座標クリア確認</h3>
+<ul>
+  <li><input type="checkbox"> 座標選択後、目的地フィールドを手動で編集 → 選択座標がリセットされる（次の検索はジオコーディングで実行）</li>
+  <li><input type="checkbox"> 別の座標カードをクリック → 以前のハイライトが消えて新しいカードがハイライトされる</li>
+</ul>
+
+<!-- ─── Section 5 ─── -->
+<h2>5　エッジケース</h2>
+<ul>
+  <li><input type="checkbox"> 2つ目のファイルをアップロード → ピッカーが新しいファイルの結果に更新される（前の結果は消える）</li>
+  <li><input type="checkbox"> 同じ座標が2回含まれるファイルをアップロード → 重複排除されて1件だけ表示される</li>
+  <li><input type="checkbox"> 10件以上の座標が含まれるファイルをアップロード → 最大10件まで表示される</li>
+</ul>
+
+<!-- ─── Section 6 ─── -->
+<h2>6　メモ欄</h2>
+<p style="font-size:13px; color:#666;">発見した問題・気になった点を記録してください。</p>
+<div class="memo">&nbsp;</div>
+
+</body>
+</html>

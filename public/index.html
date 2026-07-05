@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高速道路 料金・ルート検索</title>
+<style>
+  :root {
+    --ink: #1f2a24;
+    --paper: #f6f3ec;
+    --moss: #4a6354;
+    --moss-deep: #2f4338;
+    --clay: #c4683f;
+    --line: #d8d2c4;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --serif: 'Georgia', 'Iowan Old Style', serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--mono);
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 32px; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--moss); margin-bottom: 8px;
+  }
+  h1 {
+    font-family: var(--serif); font-size: 34px; font-weight: 400;
+    margin: 0 0 6px; letter-spacing: -0.01em;
+  }
+  .sub { color: #6b6256; font-size: 13px; }
+
+  .panel {
+    border: 1px solid var(--line); background: #fffdf8;
+    padding: 24px; margin-bottom: 28px;
+  }
+  .panel h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em;
+    margin: 0 0 16px; color: var(--moss-deep); font-weight: 600;
+  }
+
+  label {
+    display: block; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.12em; color: #8a8071; margin-bottom: 6px;
+  }
+  .input-row {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 14px;
+  }
+  .input-row input {
+    flex: 1; padding: 10px 12px; font-family: var(--mono); font-size: 14px;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+    border-radius: 2px;
+  }
+  .input-row input:focus { outline: 2px solid var(--moss); outline-offset: 1px; }
+  .input-row input::placeholder { color: #b3aa9b; }
+  .btn-geo {
+    flex-shrink: 0; background: none; border: 1px solid var(--line);
+    padding: 9px 11px; font-size: 16px; cursor: pointer; border-radius: 2px;
+    color: var(--moss); line-height: 1;
+  }
+  .btn-geo:hover { background: #f0ece3; }
+
+  .actions { margin-top: 4px; }
+  button.primary {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 11px 28px; cursor: pointer;
+    background: var(--moss-deep); color: var(--paper); border: none;
+    border-radius: 2px; transition: background 0.15s;
+  }
+  button.primary:hover { background: var(--moss); }
+  button.primary:disabled { background: #aaa; cursor: not-allowed; }
+
+  #status {
+    font-size: 12px; color: var(--moss); margin-top: 10px; min-height: 18px;
+  }
+  #status.error { color: #b94040; }
+
+  /* Map */
+  #mapWrap {
+    margin-bottom: 28px; display: none;
+    border: 1px solid var(--line);
+  }
+  #map { width: 100%; height: 420px; }
+  @media (max-width: 600px) { #map { height: 280px; } }
+
+  /* Result card */
+  #resultWrap { display: none; }
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  @media (max-width: 520px) { .result-grid { grid-template-columns: 1fr; } }
+
+  .result-row {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row.span2 {
+    grid-column: 1 / -1;
+  }
+  .result-icon { font-size: 18px; flex-shrink: 0; width: 26px; text-align: center; }
+  .result-body { flex: 1; min-width: 0; }
+  .result-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: #8a8071; margin-bottom: 2px;
+  }
+  .result-value {
+    font-size: 16px; font-weight: 600; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .result-value.toll { color: var(--clay); }
+  .result-value.none { color: #aaa; font-weight: 400; font-style: italic; }
+
+  /* Toll road chips */
+  .toll-roads-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .toll-chip {
+    font-size: 11px; padding: 3px 8px;
+    border: 1px solid var(--moss); color: var(--moss);
+    border-radius: 2px; white-space: nowrap;
+  }
+
+  /* Skeleton loader */
+  .skeleton {
+    background: linear-gradient(90deg, #e8e4dc 25%, #f0ece4 50%, #e8e4dc 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 2px; height: 18px; margin: 4px 0;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* File drop zone */
+  .drop-zone-wrap {
+    margin-top: 16px; padding-top: 14px;
+    border-top: 1px dashed var(--line);
+  }
+  .drop-zone-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: #8a8071; margin-bottom: 8px;
+  }
+  .drop-zone {
+    border: 2px dashed var(--line); border-radius: 2px;
+    padding: 18px 16px; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--paper);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--moss); background: #f0ece3;
+  }
+  .drop-zone-icon { font-size: 22px; display: block; margin-bottom: 6px; }
+  .drop-zone-text { font-size: 13px; color: var(--ink); }
+  .drop-zone-text .btn-file-pick {
+    color: var(--moss); text-decoration: underline; cursor: pointer;
+    font-size: 13px; letter-spacing: normal; text-transform: none;
+    display: inline; margin: 0;
+  }
+  .drop-zone-hint { font-size: 11px; color: #aaa; margin-top: 4px; }
+  .drop-zone.processing { opacity: 0.6; pointer-events: none; }
+
+  /* Coordinate picker */
+  #coordPickerWrap {
+    margin-top: 10px; display: none;
+  }
+  .coord-picker-header {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--moss-deep); margin-bottom: 6px; font-weight: 600;
+  }
+  .coord-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border: 1px solid var(--line);
+    margin-bottom: 4px; cursor: pointer; background: #fffdf8;
+    border-radius: 2px; transition: background 0.1s, border-color 0.1s;
+  }
+  .coord-item:hover { background: #f0ece3; border-color: var(--moss); }
+  .coord-item-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .coord-item-body { flex: 1; min-width: 0; }
+  .coord-item-value { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .coord-item-context {
+    font-size: 11px; color: #8a8071; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .coord-none { font-size: 12px; color: #aaa; padding: 8px 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Route &amp; Toll Calculator · Japan</div>
+    <h1>高速道路 料金・ルート検索</h1>
+    <p class="sub">出発地と目的地を入力すると、ETC料金・所要時間・入口/出口ICを表示します。</p>
+  </header>
+
+  <div class="panel">
+    <h2>ルート入力</h2>
+
+    <label for="originInput">出発地</label>
+    <div class="input-row">
+      <input type="text" id="originInput" placeholder="住所・地名・施設名" autocomplete="off">
+      <button class="btn-geo" id="originGeoBtn" title="現在地を使用">📍</button>
+    </div>
+
+    <label for="destInput">目的地</label>
+    <div class="input-row">
+      <input type="text" id="destInput" placeholder="住所・地名・施設名" autocomplete="off">
+      <button class="btn-geo" id="destGeoBtn" title="現在地を使用">📍</button>
+    </div>
+
+    <div class="drop-zone-wrap">
+      <div class="drop-zone-label">ドキュメントから目的地を取得</div>
+      <div class="drop-zone" id="dropZone">
+        <span class="drop-zone-icon">📄</span>
+        <div class="drop-zone-text">
+          ファイルをドラッグ&amp;ドロップ または <span class="btn-file-pick" id="filePickBtn">ファイルを選択</span>
+        </div>
+        <div class="drop-zone-hint">PDF · Word (.docx) · テキスト</div>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt,.csv" style="display:none">
+    </div>
+
+    <div id="coordPickerWrap">
+      <div class="coord-picker-header" id="coordPickerHeader">座標を選択してください</div>
+      <div id="coordList"></div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="searchBtn">ルート検索</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div id="mapWrap">
+    <div id="map"></div>
+  </div>
+
+  <div id="resultWrap">
+    <div class="panel">
+      <h2>検索結果</h2>
+      <div class="result-grid" id="resultGrid">
+        <div class="result-row">
+          <div class="result-icon">🛣</div>
+          <div class="result-body">
+            <div class="result-label">高速 入口 IC</div>
+            <div class="result-value" id="resEntryIC">—</div>
+          </div>
+        </div>
+        <div class="result-row">
+          <div class="result-icon">🛣</div>
+          <div class="result-body">
+            <div class="result-label">高速 出口 IC</div>
+            <div class="result-value" id="resExitIC">—</div>
+          </div>
+        </div>
+        <div class="result-row">
+          <div class="result-icon">📏</div>
+          <div class="result-body">
+            <div class="result-label">距離</div>
+            <div class="result-value" id="resDistance">—</div>
+          </div>
+        </div>
+        <div class="result-row">
+          <div class="result-icon">⏱</div>
+          <div class="result-body">
+            <div class="result-label">所要時間</div>
+            <div class="result-value" id="resDuration">—</div>
+          </div>
+        </div>
+        <div class="result-row span2">
+          <div class="result-icon">💰</div>
+          <div class="result-body">
+            <div class="result-label">ETC 料金</div>
+            <div class="result-value toll" id="resToll">—</div>
+          </div>
+        </div>
+        <div class="result-row span2" id="tollRoadsRow" style="display:none;">
+          <div class="result-icon">🗺</div>
+          <div class="result-body">
+            <div class="result-label">経由（推定）</div>
+            <div class="toll-roads-wrap" id="resTollRoads"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/main.js"></script>
+<script>
+  window.initGoogleMaps = function() {
+    window._googleMapsReady = true;
+    if (window._onGoogleMapsReady) window._onGoogleMapsReady();
+  };
+</script>
+</body>
+</html>

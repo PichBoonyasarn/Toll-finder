@@ -1,0 +1,15 @@
+{
+  "name": "toll-finder",
+  "version": "1.0.0",
+  "description": "高速道路 料金・ルート検索",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^4.19.0",
+    "mammoth": "^1.12.0",
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5"
+  }
+}
