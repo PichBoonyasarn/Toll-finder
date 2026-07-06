@@ -121,7 +121,19 @@ function renderMap(data, fromPos, toPos, fromLabel, toLabel) {
       streetViewControl: false,
       fullscreenControl: true,
       gestureHandling: 'greedy',
+      // Google's own scroll-to-zoom (scrollwheel: true) is tied to
+      // gestureHandling: with 'cooperative' it requires ctrl+scroll but shows
+      // a dimming "use ctrl+scroll to zoom" overlay every time; with 'greedy'
+      // it zooms on any scroll with no overlay. Neither matches "require
+      // ctrl, but never show the hint" — so scrollwheel zoom is disabled
+      // here entirely and reimplemented by hand below.
+      scrollwheel: false,
     });
+    mapEl.addEventListener('wheel', e => {
+      if (!e.ctrlKey && !e.metaKey) return; // let the page scroll normally
+      e.preventDefault();
+      mapInstance.setZoom(mapInstance.getZoom() + (e.deltaY < 0 ? 1 : -1));
+    }, { passive: false });
   }
   clearOverlays();
 
