@@ -4,6 +4,7 @@ const multer = require('multer');
 const mammoth = require('mammoth');
 const ExcelJS = require('exceljs');
 const path = require('path');
+const { planeRectangularToLatLon } = require('../lib/planeRectangular');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -121,7 +122,71 @@ function extractCoordinates(rawText) {
     add(latHit.value, lonHit.value, start, end - start);
   }
 
+  // 8. Japan Plane Rectangular Coordinate System (平面直角座標系) — a genuinely
+  // different coordinate system (meters from one of 19 zone origins, not
+  // degrees) that appears in some bridge/civil-engineering inspection forms.
+  const planeRect = findPlaneRectangularCoords(text);
+  if (planeRect) {
+    add(planeRect.lat, planeRect.lng, planeRect.index, planeRect.length);
+  }
+
   return results.slice(0, 10);
+}
+
+const PLANE_RECT_LABEL = '平面直角座標系';
+const PLANE_RECT_ZONE_WINDOW = 30;
+// X and Y aren't necessarily adjacent to "X座標"/"Y座標" labels in flattened
+// multi-page tables — in the one real sample seen so far, those labels only
+// appear once, far away, as a header for an unrelated table, while X sits
+// immediately after the zone label and Y is ~2000 characters further along
+// with no label near it at all. A generous forward window covers this.
+const PLANE_RECT_SEARCH_WINDOW = 5000;
+// Both known values have a 5-digit integer part and exactly 4 decimal
+// places (31236.4333 / -46496.4082) — distinctive enough that nothing else
+// in a typical inspection form (dates, percentages, mm dimensions) matches.
+const COORD_LIKE_NUMBER_RE = /-?\d{2,6}\.\d{3,}/g;
+// Documents write the zone as a single Unicode roman-numeral glyph (Ⅶ), but
+// NFKC normalization (applied above, needed for full-width digits) silently
+// decomposes that into plain Latin letters — "Ⅶ" becomes "VII" — before this
+// ever runs. Match the Latin-letter form directly rather than the glyph.
+const ROMAN_TO_ZONE = {
+  I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
+  XI: 11, XII: 12, XIII: 13, XIV: 14, XV: 15, XVI: 16, XVII: 17, XVIII: 18, XIX: 19,
+};
+const ZONE_TOKEN_RE = /([IVX]+|\d{1,2})\s*系/;
+
+function parseZoneToken(token) {
+  if (/^\d+$/.test(token)) {
+    const n = parseInt(token, 10);
+    return (n >= 1 && n <= 19) ? n : null;
+  }
+  return ROMAN_TO_ZONE[token] || null;
+}
+
+function findPlaneRectangularCoords(text) {
+  const zoneIdx = text.indexOf(PLANE_RECT_LABEL);
+  if (zoneIdx === -1) return null;
+
+  const zoneWindow = text.slice(zoneIdx, zoneIdx + PLANE_RECT_LABEL.length + PLANE_RECT_ZONE_WINDOW);
+  const zoneMatch = ZONE_TOKEN_RE.exec(zoneWindow);
+  const zone = zoneMatch ? parseZoneToken(zoneMatch[1]) : null;
+  if (!zone) return null;
+
+  const searchStart = zoneIdx + PLANE_RECT_LABEL.length;
+  const window = text.slice(searchStart, searchStart + PLANE_RECT_SEARCH_WINDOW);
+  const numRe = new RegExp(COORD_LIKE_NUMBER_RE.source, 'g');
+  const hits = [];
+  let m;
+  while (hits.length < 2 && (m = numRe.exec(window)) !== null) {
+    hits.push({ value: parseFloat(m[0]), index: searchStart + m.index, length: m[0].length });
+  }
+  if (hits.length < 2) return null;
+
+  const [x, y] = hits;
+  const latLon = planeRectangularToLatLon(x.value, y.value, zone);
+  if (!latLon) return null;
+
+  return { lat: latLon.lat, lng: latLon.lng, index: x.index, length: (y.index + y.length) - x.index };
 }
 
 const LABEL_PROXIMITY_WINDOW = 300;
