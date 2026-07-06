@@ -229,7 +229,13 @@ function renderCoordPicker(coords, filename) {
 
   if (!coords || coords.length === 0) {
     header.textContent = `${filename} — 座標が見つかりませんでした`;
-    list.innerHTML = '<div class="coord-none">このファイルには緯度・経度データが含まれていません。</div>';
+    list.innerHTML = `
+      <div class="coord-none">
+        このファイルから緯度・経度を自動検出できませんでした。
+        <button class="btn-link" id="manualEntryHintBtn">目的地を直接入力する</button>
+      </div>
+    `;
+    document.getElementById('manualEntryHintBtn').addEventListener('click', () => expandField('dest'));
     return;
   }
 
