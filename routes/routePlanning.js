@@ -145,8 +145,19 @@ async function findNearestIC(lat, lng, apiKey, kind = 'entry') {
       // Prefer Google's own intersection tag, but many real IC/exit POIs
       // aren't tagged that way — a name match on the expected term is a
       // reasonable fallback rather than requiring the tag.
-      const match = candidates.find(r => r.types?.includes('intersection'))
+      let match = candidates.find(r => r.types?.includes('intersection'))
         || candidates.find(r => /出口|インターチェンジ|IC/.test(r.name || ''));
+      // "インターチェンジ" is specific enough that when it returns very few
+      // results, Google's own search relevance is a decent signal even if
+      // the place's name field doesn't literally contain the suffix word
+      // (e.g. a real IC named "東名豊田" with no "インターチェンジ"/"IC" in
+      // its name at all). "出口" is too generic a word for this — it's also
+      // a real place/neighborhood name (confirmed via live query) and often
+      // returns many unrelated city landmarks, so it still requires an
+      // explicit name match.
+      if (!match && suffix === 'インターチェンジ' && candidates.length > 0 && candidates.length <= 2) {
+        match = candidates[0];
+      }
       if (match) return match.name;
     }
     return null;
