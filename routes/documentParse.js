@@ -5,6 +5,7 @@ const mammoth = require('mammoth');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const { planeRectangularToLatLon } = require('../lib/planeRectangular');
+const { ocrImageToText, isGeminiConfigured } = require('../lib/geminiOcr');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -39,7 +40,11 @@ const RE_JA_DMS = /(?:北緯|緯度)\s*[:：]?\s*(\d+)\s*度\s*(\d+)\s*分\s*([\
 // The seconds mark also accepts two consecutive prime characters (′′) —
 // NFKC normalization (applied below) decomposes a real ″ DOUBLE PRIME into
 // exactly that, so a literal ″ never survives to reach this regex.
-const RE_EN_DMS = /(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)(?:[″"]|[′']{2})\s*([NS])?\s*[,\s]+(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)(?:[″"]|[′']{2})\s*([EW])?/g;
+// Also tolerates 北緯/緯度 and 東経/経度 labels wrapping symbol-based DMS
+// (e.g. OCR'd site maps read as "北緯 37°22′36.4″ 東経 139°15′30.2″") — the
+// 東経/経度 label sits *between* the two DMS groups, not just before the
+// whole match, so it has to be part of the connector, not a separate prefix.
+const RE_EN_DMS = /(?:北緯|緯度)?\s*(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)(?:[″"]|[′']{2})\s*([NS])?\s*[,\s]*(?:東経|経度)?\s*(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)(?:[″"]|[′']{2})\s*([EW])?/g;
 
 // Pattern 3 — Labeled decimal: 緯度: 35.6895 / 経度: 139.6917  (or lat/lon/latitude/longitude)
 const RE_LABELED = /(?:緯度|lat(?:itude)?)\s*[:：]\s*([-\d.]+)\s*[\/,、\s]+(?:経度|lon(?:gitude)?|lng)\s*[:：]\s*([-\d.]+)/gi;
@@ -369,6 +374,41 @@ function fixFilenameEncoding(name) {
   return Buffer.from(name, 'latin1').toString('utf8');
 }
 
+// OCR fallback for image-based PDFs (scanned documents, or coordinate info
+// baked into a diagram rather than the text layer) that pdf-parse extracts
+// nothing usable from. Capped at OCR_MAX_PAGES and stops at the first page
+// that yields a real coordinate match — Gemini's free tier is generous
+// (1,500 requests/day) but there's no reason to burn extra calls once an
+// answer is found, and the location info has consistently shown up on an
+// early page in every real document seen so far.
+const OCR_MAX_PAGES = 3;
+
+async function ocrFallbackCoordinates(buffer) {
+  if (!isGeminiConfigured()) return [];
+  const { PDFParse } = require('pdf-parse');
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const info = await parser.getInfo();
+    const pageCount = Math.min(OCR_MAX_PAGES, info.total || 1);
+    const pageNumbers = Array.from({ length: pageCount }, (_, i) => i + 1);
+    const screenshots = await parser.getScreenshot({ partial: pageNumbers });
+
+    for (const page of screenshots.pages) {
+      if (!page.data) continue;
+      const base64 = Buffer.from(page.data).toString('base64');
+      const text = await ocrImageToText(base64);
+      if (!text) continue;
+      const coords = extractCoordinates(text);
+      if (coords.length > 0) return coords;
+    }
+    return [];
+  } catch {
+    return [];
+  } finally {
+    await parser.destroy();
+  }
+}
+
 router.post('/', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ファイルが選択されていません' });
 
@@ -376,7 +416,12 @@ router.post('/', upload.single('file'), async (req, res) => {
 
   try {
     const text = await extractText(req.file.buffer, filename);
-    const coordinates = extractCoordinates(text);
+    let coordinates = extractCoordinates(text);
+
+    if (coordinates.length === 0 && path.extname(filename).toLowerCase() === '.pdf') {
+      coordinates = await ocrFallbackCoordinates(req.file.buffer);
+    }
+
     res.json({ coordinates, filename });
   } catch (err) {
     console.error('documentParse error:', err.message);
