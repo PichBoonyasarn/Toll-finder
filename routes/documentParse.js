@@ -27,8 +27,14 @@ function validateJapan(lat, lng) {
 // Pattern 1 — Japanese DMS: 北緯35度41分22秒 東経139度41分30秒
 const RE_JA_DMS = /北緯\s*(\d+)\s*度\s*(\d+)\s*分\s*([\d.]+)\s*秒\s*[、,\s]*東経\s*(\d+)\s*度\s*(\d+)\s*分\s*([\d.]+)\s*秒/g;
 
-// Pattern 2 — English DMS: 35°41'22"N 139°41'30"E  (also ′ ″ variants)
-const RE_EN_DMS = /(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)[″"]\s*([NS])\s*[,\s]+(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)[″"]\s*([EW])/g;
+// Pattern 2 — English DMS: 35°41'22"N 139°41'30"E  (also ′ ″ variants).
+// The N/E direction letter is optional — some inspection-form PDFs print
+// bare "34°53′37.33″ 135°12′14.98″" with no suffix, and since this tool is
+// Japan-only, a missing direction always means North/East anyway.
+// The seconds mark also accepts two consecutive prime characters (′′) —
+// NFKC normalization (applied below) decomposes a real ″ DOUBLE PRIME into
+// exactly that, so a literal ″ never survives to reach this regex.
+const RE_EN_DMS = /(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)(?:[″"]|[′']{2})\s*([NS])?\s*[,\s]+(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)(?:[″"]|[′']{2})\s*([EW])?/g;
 
 // Pattern 3 — Labeled decimal: 緯度: 35.6895 / 経度: 139.6917  (or lat/lon/latitude/longitude)
 const RE_LABELED = /(?:緯度|lat(?:itude)?)\s*[:：]\s*([-\d.]+)\s*[\/,、\s]+(?:経度|lon(?:gitude)?|lng)\s*[:：]\s*([-\d.]+)/gi;
@@ -102,7 +108,48 @@ function extractCoordinates(rawText) {
     add(parseFloat(m[1]), parseFloat(m[2]), m.index, m[0].length);
   }
 
+  // 7. Label proximity — some multi-page inspection-form PDFs flatten their
+  // table layout so the label and value end up far apart, duplicated, or
+  // tab-separated instead of adjacent (e.g. "経度 経度\t0137.454318 ...").
+  // Instead of requiring strict adjacency, scan forward from each label
+  // occurrence for the first in-range decimal number.
+  const latHit = findNearbyLabeledValue(text, LAT_KEYWORDS, false);
+  const lonHit = findNearbyLabeledValue(text, LON_KEYWORDS, true);
+  if (latHit && lonHit) {
+    const start = Math.min(latHit.index, lonHit.index);
+    const end = Math.max(latHit.index + latHit.length, lonHit.index + lonHit.length);
+    add(latHit.value, lonHit.value, start, end - start);
+  }
+
   return results.slice(0, 10);
+}
+
+const LABEL_PROXIMITY_WINDOW = 300;
+const PROXIMITY_NUMBER_RE = /\d{1,4}\.\d{3,}/g;
+
+// Scans forward from every occurrence of any keyword in `keywords` for the
+// nearest number (within LABEL_PROXIMITY_WINDOW chars) that falls in the
+// valid lat/lon range for Japan — skipping occurrences with nothing nearby
+// (many pages repeat the label with no value, e.g. a blank template row).
+function findNearbyLabeledValue(text, keywords, isLon) {
+  const [lo, hi] = isLon ? [LNG_MIN, LNG_MAX] : [LAT_MIN, LAT_MAX];
+  for (const kw of keywords) {
+    let searchFrom = 0;
+    let kwIndex;
+    while ((kwIndex = text.indexOf(kw, searchFrom)) !== -1) {
+      searchFrom = kwIndex + kw.length;
+      const window = text.slice(searchFrom, searchFrom + LABEL_PROXIMITY_WINDOW);
+      const numRe = new RegExp(PROXIMITY_NUMBER_RE.source, 'g');
+      let m;
+      while ((m = numRe.exec(window)) !== null) {
+        const value = parseFloat(m[0]);
+        if (value >= lo && value <= hi) {
+          return { value, index: searchFrom + m.index, length: m[0].length };
+        }
+      }
+    }
+  }
+  return null;
 }
 
 // Japanese government inspection forms store coordinates as compact DMS
@@ -131,6 +178,37 @@ function compactDmsToDecimal(value, isLon) {
   return Math.round((deg + min / 60 + sec / 3600) * 1e6) / 1e6;
 }
 
+// Some inspection forms store the value next to the label as a plain decimal
+// degree (e.g. 35.397777) instead of compact DMS — try that first since its
+// range never overlaps compact DMS (24-46 / 122-154 vs 240000+ / 1230000+).
+function inJapanRange(value, isLon) {
+  const [lo, hi] = isLon ? [LNG_MIN, LNG_MAX] : [LAT_MIN, LAT_MAX];
+  return value >= lo && value <= hi;
+}
+
+function numberToDecimal(value, isLon) {
+  if (inJapanRange(value, isLon)) return value;
+  return compactDmsToDecimal(value, isLon);
+}
+
+// Other forms store the value as a formatted DMS string in the cell itself,
+// e.g. 36° 58' 18.68" — no direction letter, since it's implied by which
+// label (緯度/経度) the cell sits next to. Straight and curly prime/quote
+// marks both appear in practice depending on how the form was typed.
+const DMS_STRING_RE = /^\s*(\d+)[°˚]\s*(\d+)[′']\s*([\d.]+)(?:[″"]|[′']{2})?\s*$/;
+
+function dmsStringToDecimal(str, isLon) {
+  const m = DMS_STRING_RE.exec(str);
+  if (!m) return null;
+  const decimal = parseFloat(m[1]) + parseFloat(m[2]) / 60 + parseFloat(m[3]) / 3600;
+  return inJapanRange(decimal, isLon) ? decimal : null;
+}
+
+function adjacentValueToDecimal(rawValue, isLon) {
+  if (typeof rawValue === 'number') return numberToDecimal(rawValue, isLon);
+  return dmsStringToDecimal(String(rawValue), isLon);
+}
+
 function findCoordsByLabel(workbook) {
   for (const sheet of workbook.worksheets) {
     let latVal = null, lonVal = null;
@@ -145,14 +223,14 @@ function findCoordsByLabel(workbook) {
         const isLon = LON_KEYWORDS.some(k => label.includes(k));
         if (!isLat && !isLon) continue;
 
-        // scan the 5 cells to the right for the first numeric value
+        // scan the 5 cells to the right for the first parseable value
+        // (plain number, compact-DMS number, or a "36° 58' 18.68"" DMS string)
         for (let offset = 1; offset <= 5; offset++) {
           const adj = sheet.getCell(cell.row, cell.col + offset);
           if (adj.value === null || adj.value === undefined) continue;
-          const num = Number(adj.value);
-          if (Number.isNaN(num)) continue;
-          if (isLat) latVal = compactDmsToDecimal(num, false);
-          else lonVal = compactDmsToDecimal(num, true);
+          const decimal = adjacentValueToDecimal(adj.value, isLon);
+          if (decimal === null) continue;
+          if (isLat) latVal = decimal; else lonVal = decimal;
           break;
         }
 
@@ -197,9 +275,15 @@ async function extractText(buffer, filename) {
   }
 
   if (ext === '.pdf') {
-    const pdfParse = require('pdf-parse');
-    const data = await pdfParse(buffer);
-    return data.text;
+    // pdf-parse v2 replaced the old callable-function API with a class
+    const { PDFParse } = require('pdf-parse');
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return result.text;
+    } finally {
+      await parser.destroy();
+    }
   }
 
   if (ext === '.xlsx' || ext === '.xls') {
@@ -209,13 +293,22 @@ async function extractText(buffer, filename) {
   return buffer.toString('utf-8');
 }
 
+// multer/busboy decode multipart filenames as latin1 by default, but browsers
+// send them as UTF-8 — reversing the (mis)decoding recovers the original bytes.
+// A no-op for pure-ASCII names, so this is always safe to apply.
+function fixFilenameEncoding(name) {
+  return Buffer.from(name, 'latin1').toString('utf8');
+}
+
 router.post('/', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ファイルが選択されていません' });
 
+  const filename = fixFilenameEncoding(req.file.originalname);
+
   try {
-    const text = await extractText(req.file.buffer, req.file.originalname);
+    const text = await extractText(req.file.buffer, filename);
     const coordinates = extractCoordinates(text);
-    res.json({ coordinates, filename: req.file.originalname });
+    res.json({ coordinates, filename });
   } catch (err) {
     console.error('documentParse error:', err.message);
     res.status(500).json({ error: `ファイルの解析に失敗しました: ${err.message}` });
