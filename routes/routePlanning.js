@@ -136,7 +136,12 @@ async function findNearestIC(lat, lng, apiKey, kind = 'entry') {
         `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${q}&location=${lat},${lng}&radius=10000&key=${apiKey}&language=ja`
       );
       const placeJson = await placeRes.json();
-      const candidates = placeJson.results || [];
+      // "出口" is also a real Japanese place name (a sublocality near both
+      // Toyota and Kobe is literally named 出口, confirmed via live query) —
+      // exclude political/administrative results before name-matching, since
+      // a real interchange/exit is never tagged that way, or the bare place
+      // name "出口" trivially (and wrongly) satisfies the name-match below.
+      const candidates = (placeJson.results || []).filter(r => !r.types?.includes('political'));
       // Prefer Google's own intersection tag, but many real IC/exit POIs
       // aren't tagged that way — a name match on the expected term is a
       // reasonable fallback rather than requiring the tag.
@@ -173,7 +178,12 @@ async function extractICs(route, apiKey) {
   // expressway exits that appear as "XX 出口を..."). Fall back to IC lookup.
   const lastInstr = lastStep.navigationInstruction?.instructions || '';
   const exitTextMatch = lastInstr.match(EXIT_PARSE);
-  const exitNameFromText = exitTextMatch ? exitTextMatch[1].trim() + '出口' : null;
+  // Don't let a whitespace-only capture (possible since (.+?) only requires
+  // 1+ characters, not a non-space one) turn into the truthy literal "出口"
+  // once the suffix is appended below — that would silently skip the
+  // findNearestIC fallback and return a bare, useless "name".
+  const exitNameCaptured = exitTextMatch ? exitTextMatch[1].trim() : '';
+  const exitNameFromText = exitNameCaptured ? exitNameCaptured + '出口' : null;
 
   // Run both IC lookups in parallel to minimise latency.
   const [entryIC, exitICFromSearch] = await Promise.all([
