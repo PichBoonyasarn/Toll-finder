@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Toll-Finder Test Checklist</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 860px; margin: 40px auto; padding: 0 24px; color: #1a1a1a; }
+  h1 { font-size: 24px; border-bottom: 3px solid #2f4338; padding-bottom: 10px; color: #2f4338; }
+  .meta { color: #666; font-size: 14px; margin-bottom: 32px; }
+  h2 { font-size: 16px; background: #2f4338; color: #fff; padding: 8px 14px; margin-top: 32px; border-radius: 2px; }
+  h3 { font-size: 14px; color: #2f4338; margin: 20px 0 8px; border-left: 4px solid #c4683f; padding-left: 10px; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; font-size: 14px; line-height: 1.5; border-bottom: 1px solid #f0ece4; }
+  li:last-child { border-bottom: none; }
+  input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; width: 16px; height: 16px; accent-color: #2f4338; }
+  .indent { padding-left: 26px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 12px 0; }
+  th { background: #f0ece4; padding: 8px 12px; text-align: left; border: 1px solid #d8d2c4; }
+  td { padding: 7px 12px; border: 1px solid #d8d2c4; vertical-align: top; }
+  td.center { text-align: center; }
+  .note { background: #fffdf8; border: 1px solid #d8d2c4; border-left: 4px solid #c4683f; padding: 10px 14px; font-size: 13px; margin: 10px 0; color: #555; }
+  .memo { border: 1px solid #d8d2c4; min-height: 100px; padding: 12px; margin-top: 8px; font-size: 14px; color: #aaa; }
+  .tag-important { background: #c4683f; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: bold; margin-left: 6px; vertical-align: middle; }
+  .date-row { display: flex; gap: 40px; margin-bottom: 24px; font-size: 14px; }
+  .date-row span { border-bottom: 1px solid #999; min-width: 200px; display: inline-block; padding-bottom: 2px; }
+</style>
+</head>
+<body>
+
+<h1>🛣 Toll-Finder App Test Checklist</h1>
+<div class="meta">
+  <div class="date-row">
+    <div>Test date: <span>&nbsp;</span></div>
+    <div>Tester: <span>&nbsp;</span></div>
+  </div>
+</div>
+
+<!-- ─── Section 1 ─── -->
+<h2>1　Startup &amp; Configuration Check</h2>
+<ul>
+  <li><input type="checkbox"> Run <code>npm start</code> in the folder <code>C:\Users\Staff\Pich\work\Coding\toll-finder</code> (or double-click <code>start.bat</code>)</li>
+  <li><input type="checkbox"> Terminal shows <strong>"toll-finder running at http://localhost:3100"</strong></li>
+  <li><input type="checkbox"> Open <code>http://localhost:3100</code> in a browser — the page loads correctly</li>
+  <li><input type="checkbox"> F12 DevTools → Console tab shows no errors</li>
+  <li><input type="checkbox"> The origin field is pre-filled with the company address (Nagaokakyo)</li>
+</ul>
+
+<!-- ─── Section 2 ─── -->
+<h2>2　Route Search (Basic Behavior)</h2>
+
+<h3>With expressway — Destination: Tokyo Station</h3>
+<ul>
+  <li><input type="checkbox"> A blue route line appears on the map</li>
+  <li><input type="checkbox"> The expressway entrance IC name is shown (e.g. Oyamazaki IC / Nagaokakyo IC)</li>
+  <li><input type="checkbox"> The expressway exit IC name is shown (e.g. Tokyo IC / Shuto Expressway exit)</li>
+  <li><input type="checkbox"> Distance shows a reasonable value (approx. 450–550 km)</li>
+  <li><input type="checkbox"> Travel time shows a reasonable value (approx. 4–5 hours)</li>
+  <li><input type="checkbox"> ETC toll fee is shown in orange with a ¥ amount</li>
+  <li><input type="checkbox"> Route chips show the expressway names used (e.g. Meishin, Shin-Tomei)</li>
+</ul>
+
+<h3>Without expressway — Origin: Nagaokakyo City　Destination: Muko City</h3>
+<ul>
+  <li><input type="checkbox"> ETC fee: shows "No expressway (free)"</li>
+  <li><input type="checkbox"> Entrance IC / Exit IC: shows "Not detected"</li>
+</ul>
+
+<h3>📍 Location Button</h3>
+<ul>
+  <li><input type="checkbox"> Click 📍 → the browser requests location permission</li>
+  <li><input type="checkbox"> After granting permission, the field auto-fills with the current address</li>
+</ul>
+
+<h3>Error Handling</h3>
+<ul>
+  <li><input type="checkbox"> Enter an invalid destination (e.g. "aaaaaaaaa") → a red error message appears (no crash)</li>
+  <li><input type="checkbox"> Search with an empty origin → shows "Please enter an origin" error</li>
+</ul>
+
+<!-- ─── Section 3 ─── -->
+<h2>3　Document Scan — File Upload</h2>
+
+<h3>Drop Zone UI</h3>
+<ul>
+  <li><input type="checkbox"> A drop zone appears below the destination field</li>
+  <li><input type="checkbox"> Dragging a file over the zone turns the border green</li>
+  <li><input type="checkbox"> Dragging away from the zone restores the border</li>
+  <li><input type="checkbox"> Clicking the "Select file" link → opens the file picker (PDF / DOCX / TXT supported)</li>
+  <li><input type="checkbox"> Clicking anywhere in the drop zone → opens the file picker</li>
+</ul>
+
+<h3>Coordinate Format Tests (create and upload .txt files)</h3>
+<div class="note">Test each format below in its own text file, or combine all lines into one file and test together.</div>
+
+<table>
+  <tr>
+    <th>Test Content</th>
+    <th>Format</th>
+    <th>Pass/Fail</th>
+  </tr>
+  <tr>
+    <td><code>Lat: 34.9153, Lng: 135.6865</code></td>
+    <td>Labeled decimal</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>北緯35度41分22秒 東経139度41分30秒</code></td>
+    <td>Japanese DMS</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>35°41'22"N 139°41'30"E</code></td>
+    <td>English DMS</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>35.6580N, 139.7016E</code></td>
+    <td>Decimal with direction</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>34.6785, 135.8324</code></td>
+    <td>Plain decimal pair</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td><code>３５．６８９５，１３９．６９１７</code> (full-width digits)</td>
+    <td>Full-width → half-width conversion (NFKC)</td>
+    <td class="center"><input type="checkbox"></td>
+  </tr>
+</table>
+
+<h3>File Format Tests</h3>
+<ul>
+  <li><input type="checkbox"> Drop a <strong>.txt</strong> file → coordinates are detected</li>
+  <li><input type="checkbox"> Drop a <strong>.docx</strong> file → coordinates are detected (a real job-site document is recommended)</li>
+  <li><input type="checkbox"> Drop a <strong>.pdf</strong> file → coordinates are detected (a real job-site document is recommended)</li>
+</ul>
+
+<h3>Result Display</h3>
+<ul>
+  <li><input type="checkbox"> After upload, a coordinate picker appears (file name + number of results)</li>
+  <li><input type="checkbox"> Each card shows the latitude/longitude and surrounding context text</li>
+  <li><input type="checkbox"> Uploading a file with no coordinates → shows "No coordinates found"</li>
+</ul>
+
+<!-- ─── Section 4 ─── -->
+<h2>4　Coordinate Selection → Route Search (Integration Test)<span class="tag-important">CRITICAL</span></h2>
+
+<div class="note">Upload a file containing coordinates, then test in this order.</div>
+<ul>
+  <li><input type="checkbox"> Click a coordinate card → the destination field fills with "35.xxxxx, 139.xxxxx"</li>
+  <li><input type="checkbox"> The clicked card gets a green highlight</li>
+  <li><input type="checkbox"> Click Search Route → the route is calculated correctly (skips geocoding, uses the coordinates directly)</li>
+  <li><input type="checkbox"> The map and result cards (IC names, distance, time, ETC fee) display correctly</li>
+</ul>
+
+<h3>Coordinate Clear Check</h3>
+<ul>
+  <li><input type="checkbox"> After selecting a coordinate, manually edit the destination field → the selected coordinate resets (next search uses geocoding)</li>
+  <li><input type="checkbox"> Click a different coordinate card → the previous highlight clears and the new card is highlighted</li>
+</ul>
+
+<!-- ─── Section 5 ─── -->
+<h2>5　Edge Cases</h2>
+<ul>
+  <li><input type="checkbox"> Upload a second file → the picker updates to the new file's results (previous results disappear)</li>
+  <li><input type="checkbox"> Upload a file containing the same coordinate twice → duplicates are removed, only 1 entry is shown</li>
+  <li><input type="checkbox"> Upload a file with 10+ coordinates → a maximum of 10 entries are shown</li>
+</ul>
+
+<!-- ─── Section 6 ─── -->
+<h2>6　Notes</h2>
+<p style="font-size:13px; color:#666;">Record any issues or points of concern found during testing.</p>
+<div class="memo">&nbsp;</div>
+
+</body>
+</html>

@@ -65,6 +65,47 @@
   }
   .btn-geo:hover { background: #f0ece3; }
 
+  /* Collapsible origin/destination fields */
+  .field-block { margin-bottom: 14px; }
+  .field-row { display: flex; align-items: center; gap: 8px; }
+  .field-row .input-row { flex: 1; margin-bottom: 0; }
+  .field-value {
+    flex: 1; padding: 10px 12px; font-size: 14px;
+    border: 1px solid var(--line); border-radius: 2px;
+    background: var(--paper); color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .field-value.none { color: #aaa; font-style: italic; }
+  .btn-link {
+    flex-shrink: 0; background: none; border: none; padding: 4px 2px;
+    font-family: var(--mono); font-size: 12px; color: var(--moss);
+    text-decoration: underline; cursor: pointer;
+  }
+  .btn-link:hover { color: var(--moss-deep); }
+
+  /* Copy-ready result line */
+  .copy-row {
+    margin-top: 16px; padding-top: 14px;
+    border-top: 1px dashed var(--line);
+  }
+  .copy-row-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: #8a8071; margin-bottom: 8px;
+  }
+  .copy-row-body { display: flex; gap: 8px; align-items: center; }
+  .copy-text {
+    flex: 1; font-family: var(--mono); font-size: 12px;
+    padding: 10px 12px; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 2px; overflow-x: auto; white-space: nowrap; color: var(--ink);
+  }
+  .btn-copy {
+    flex-shrink: 0; font-family: var(--mono); background: none;
+    border: 1px solid var(--line); padding: 9px 14px; font-size: 12px;
+    cursor: pointer; border-radius: 2px; color: var(--moss);
+  }
+  .btn-copy:hover { background: #f0ece3; }
+  .btn-copy.copied { color: var(--moss-deep); border-color: var(--moss); }
+
   .actions { margin-top: 4px; }
   button.primary {
     font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em;
@@ -199,16 +240,28 @@
   <div class="panel">
     <h2>ルート入力</h2>
 
-    <label for="originInput">出発地</label>
-    <div class="input-row">
-      <input type="text" id="originInput" placeholder="住所・地名・施設名" autocomplete="off">
-      <button class="btn-geo" id="originGeoBtn" title="現在地を使用">📍</button>
+    <label>出発地</label>
+    <div class="field-block" id="originBlock">
+      <div class="field-row">
+        <div class="field-value" id="originSummaryValue">—</div>
+        <div class="input-row" id="originInputRow" style="display:none;">
+          <input type="text" id="originInput" placeholder="住所・地名・施設名" autocomplete="off">
+          <button class="btn-geo" id="originGeoBtn" title="現在地を使用">📍</button>
+        </div>
+        <button class="btn-link" id="originToggleBtn">変更</button>
+      </div>
     </div>
 
-    <label for="destInput">目的地</label>
-    <div class="input-row">
-      <input type="text" id="destInput" placeholder="住所・地名・施設名" autocomplete="off">
-      <button class="btn-geo" id="destGeoBtn" title="現在地を使用">📍</button>
+    <label>目的地</label>
+    <div class="field-block" id="destBlock">
+      <div class="field-row">
+        <div class="field-value none" id="destSummaryValue">ドキュメントをアップロードすると自動入力されます</div>
+        <div class="input-row" id="destInputRow" style="display:none;">
+          <input type="text" id="destInput" placeholder="住所・地名・施設名" autocomplete="off">
+          <button class="btn-geo" id="destGeoBtn" title="現在地を使用">📍</button>
+        </div>
+        <button class="btn-link" id="destToggleBtn">入力</button>
+      </div>
     </div>
 
     <div class="drop-zone-wrap">
@@ -218,9 +271,9 @@
         <div class="drop-zone-text">
           ファイルをドラッグ&amp;ドロップ または <span class="btn-file-pick" id="filePickBtn">ファイルを選択</span>
         </div>
-        <div class="drop-zone-hint">PDF · Word (.docx) · テキスト</div>
+        <div class="drop-zone-hint">PDF · Word (.docx) · Excel (.xlsx) · テキスト</div>
       </div>
-      <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt,.csv" style="display:none">
+      <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.csv" style="display:none">
     </div>
 
     <div id="coordPickerWrap">
@@ -283,6 +336,14 @@
             <div class="result-label">経由（推定）</div>
             <div class="toll-roads-wrap" id="resTollRoads"></div>
           </div>
+        </div>
+      </div>
+
+      <div class="copy-row">
+        <div class="copy-row-label">コピー用テキスト</div>
+        <div class="copy-row-body">
+          <code class="copy-text" id="copyText">—</code>
+          <button class="btn-copy" id="copyBtn">📋 コピー</button>
         </div>
       </div>
     </div>

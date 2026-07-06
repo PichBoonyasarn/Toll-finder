@@ -31,6 +31,56 @@ function formatToll(tollEstimate) {
   return currencyCode === 'JPY' ? `¥${amount.toLocaleString('ja-JP')}` : `${amount.toLocaleString()} ${currencyCode}`;
 }
 
+// ── Collapsible origin/destination fields ──────────────────────────────────────
+
+const FIELD_EMPTY_TEXT = { origin: '—', dest: 'ドキュメントをアップロードすると自動入力されます' };
+const FIELD_EMPTY_LABEL = { origin: '変更', dest: '入力' };
+
+function expandField(prefix) {
+  document.getElementById(`${prefix}SummaryValue`).style.display = 'none';
+  document.getElementById(`${prefix}InputRow`).style.display = 'flex';
+  document.getElementById(`${prefix}ToggleBtn`).textContent = '閉じる';
+  document.getElementById(`${prefix}Input`).focus();
+}
+
+function collapseField(prefix) {
+  const valueEl = document.getElementById(`${prefix}SummaryValue`);
+  const input = document.getElementById(`${prefix}Input`);
+  const val = input.value.trim();
+
+  valueEl.textContent = val || FIELD_EMPTY_TEXT[prefix];
+  valueEl.classList.toggle('none', !val);
+  valueEl.style.display = '';
+  document.getElementById(`${prefix}InputRow`).style.display = 'none';
+  document.getElementById(`${prefix}ToggleBtn`).textContent = val ? '変更' : FIELD_EMPTY_LABEL[prefix];
+}
+
+function setFieldSummary(prefix, text) {
+  const valueEl = document.getElementById(`${prefix}SummaryValue`);
+  valueEl.textContent = text;
+  valueEl.classList.remove('none');
+  valueEl.style.display = '';
+  document.getElementById(`${prefix}InputRow`).style.display = 'none';
+  document.getElementById(`${prefix}ToggleBtn`).textContent = '変更';
+}
+
+function toggleField(prefix) {
+  const isEditing = document.getElementById(`${prefix}InputRow`).style.display !== 'none';
+  if (isEditing) collapseField(prefix); else expandField(prefix);
+}
+
+// ── Copy-ready result line ──────────────────────────────────────────────────────
+
+function buildCopyLine(data, entryText, exitText, distanceText, durationText, tollText) {
+  return [
+    `距離 ${distanceText}`,
+    `所要時間 ${durationText}`,
+    `ETC料金 ${tollText}`,
+    `入口IC ${entryText || '検出できませんでした'}`,
+    `出口IC ${exitText || '検出できませんでした'}`,
+  ].join('　');
+}
+
 // ── Google Maps loading ───────────────────────────────────────────────────────
 
 function loadGoogleMapsScript(key, callback) {
@@ -107,8 +157,10 @@ function renderResult(data) {
   const exitText  = data.exitICs  && data.exitICs.length  ? data.exitICs.join(' / ')  : null;
   setVal('resEntryIC',   entryText || '検出できませんでした', !entryText);
   setVal('resExitIC',    exitText  || '検出できませんでした', !exitText);
-  setVal('resDistance',  formatDistance(data.distanceMeters));
-  setVal('resDuration',  formatDuration(data.durationSeconds));
+  const distanceText = formatDistance(data.distanceMeters);
+  const durationText = formatDuration(data.durationSeconds);
+  setVal('resDistance',  distanceText);
+  setVal('resDuration',  durationText);
 
   const tollText = formatToll(data.tollEstimate);
   setVal('resToll', tollText || '高速道路なし（無料）', !tollText);
@@ -124,6 +176,10 @@ function renderResult(data) {
     tollRoadsRow.style.display = 'none';
     tollRoadsWrap.innerHTML = '';
   }
+
+  document.getElementById('copyText').textContent = buildCopyLine(
+    data, entryText, exitText, distanceText, durationText, tollText || '高速道路なし（無料）'
+  );
 }
 
 // ── Geocoding ─────────────────────────────────────────────────────────────────
@@ -170,17 +226,25 @@ function renderCoordPicker(coords, filename) {
 
   list.querySelectorAll('.coord-item').forEach(el => {
     el.addEventListener('click', () => {
-      const idx = parseInt(el.dataset.idx, 10);
-      const c = coords[idx];
-      selectedDestCoord = { lat: c.lat, lng: c.lng };
-      document.getElementById('destInput').value = `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
-
-      // Highlight selected item
-      list.querySelectorAll('.coord-item').forEach(e => e.style.borderColor = '');
-      el.style.borderColor = 'var(--moss)';
-      el.style.background = '#e8f0ea';
+      selectCoordItem(coords, parseInt(el.dataset.idx, 10), list);
     });
   });
+
+  // Auto-pick the first coordinate found and search immediately — no click required
+  selectCoordItem(coords, 0, list);
+}
+
+function selectCoordItem(coords, idx, listEl) {
+  const c = coords[idx];
+  selectedDestCoord = { lat: c.lat, lng: c.lng };
+  document.getElementById('destInput').value = `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+  collapseField('dest');
+
+  listEl.querySelectorAll('.coord-item').forEach(e => e.style.borderColor = '');
+  const el = listEl.querySelector(`.coord-item[data-idx="${idx}"]`);
+  if (el) { el.style.borderColor = 'var(--moss)'; el.style.background = '#e8f0ea'; }
+
+  onSearch();
 }
 
 async function uploadFile(file) {
@@ -262,6 +326,8 @@ async function onSearch() {
 
     renderMap(data, { lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }, from.formatted, to.formatted);
     renderResult(data);
+    setFieldSummary('origin', from.formatted);
+    setFieldSummary('dest', to.formatted);
     setStatus('');
   } catch (err) {
     setStatus(err.message, true);
@@ -301,6 +367,19 @@ async function initApp() {
   if (cfg.companyAddress) {
     document.getElementById('originInput').value = cfg.companyAddress;
   }
+  collapseField('origin');
+
+  document.getElementById('originToggleBtn').addEventListener('click', () => toggleField('origin'));
+  document.getElementById('destToggleBtn').addEventListener('click', () => toggleField('dest'));
+
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const btn = document.getElementById('copyBtn');
+    navigator.clipboard.writeText(document.getElementById('copyText').textContent).then(() => {
+      btn.textContent = '✓ コピーしました';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '📋 コピー'; btn.classList.remove('copied'); }, 1500);
+    });
+  });
 
   initFileUpload();
 
@@ -315,6 +394,9 @@ async function initApp() {
 
     document.getElementById('searchBtn').addEventListener('click', onSearch);
     document.getElementById('destInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') onSearch();
+    });
+    document.getElementById('originInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') onSearch();
     });
   });

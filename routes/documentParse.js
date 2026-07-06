@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const mammoth = require('mammoth');
+const ExcelJS = require('exceljs');
 const path = require('path');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -104,6 +105,89 @@ function extractCoordinates(rawText) {
   return results.slice(0, 10);
 }
 
+// Japanese government inspection forms store coordinates as compact DMS
+// numbers (DDMMSS.S / DDDMMSS.S) in the cell next to a 緯度/経度 label,
+// not as plain decimal or standard DMS text — the generic regex patterns
+// above can't see this until it's normalized into a "緯度: / 経度:" line.
+const LAT_KEYWORDS = ['緯度', '北緯'];
+const LON_KEYWORDS = ['経度', '東経'];
+const LAT_COMPACT_MIN = 240000, LAT_COMPACT_MAX = 465959;   // 24°-46°N
+const LON_COMPACT_MIN = 1230000, LON_COMPACT_MAX = 1545959; // 123°-154°E
+
+function normalizeLabel(s) {
+  return s.replace(/[ 　]/g, '').trim();
+}
+
+function compactDmsToDecimal(value, isLon) {
+  const [lo, hi] = isLon ? [LON_COMPACT_MIN, LON_COMPACT_MAX] : [LAT_COMPACT_MIN, LAT_COMPACT_MAX];
+  if (value < lo || value > hi) return null;
+
+  const intPart = Math.trunc(value);
+  const fracPart = value - intPart;
+  const deg = isLon ? Math.trunc(intPart / 10000) : Math.trunc(intPart / 10000);
+  const min = Math.trunc((intPart % 10000) / 100);
+  const sec = (intPart % 100) + fracPart;
+
+  return Math.round((deg + min / 60 + sec / 3600) * 1e6) / 1e6;
+}
+
+function findCoordsByLabel(workbook) {
+  for (const sheet of workbook.worksheets) {
+    let latVal = null, lonVal = null;
+
+    for (const row of sheet._rows || []) {
+      if (!row) continue;
+      for (const cell of row._cells || []) {
+        if (!cell || cell.value === null || cell.value === undefined) continue;
+        const label = normalizeLabel(String(cell.value));
+
+        const isLat = LAT_KEYWORDS.some(k => label.includes(k));
+        const isLon = LON_KEYWORDS.some(k => label.includes(k));
+        if (!isLat && !isLon) continue;
+
+        // scan the 5 cells to the right for the first numeric value
+        for (let offset = 1; offset <= 5; offset++) {
+          const adj = sheet.getCell(cell.row, cell.col + offset);
+          if (adj.value === null || adj.value === undefined) continue;
+          const num = Number(adj.value);
+          if (Number.isNaN(num)) continue;
+          if (isLat) latVal = compactDmsToDecimal(num, false);
+          else lonVal = compactDmsToDecimal(num, true);
+          break;
+        }
+
+        if (latVal !== null && lonVal !== null) return { lat: latVal, lng: lonVal };
+      }
+    }
+  }
+  return null;
+}
+
+async function extractExcel(buffer) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+
+  const coords = findCoordsByLabel(workbook);
+
+  const texts = [];
+  for (const sheet of workbook.worksheets) {
+    sheet.eachRow(row => {
+      row.eachCell(cell => {
+        if (cell.value !== null && cell.value !== undefined) {
+          const s = String(cell.value).trim();
+          if (s) texts.push(s);
+        }
+      });
+    });
+  }
+
+  const flatText = texts.join('\n');
+  if (coords) {
+    return `緯度: ${coords.lat.toFixed(6)}\n経度: ${coords.lng.toFixed(6)}\n${flatText}`;
+  }
+  return flatText;
+}
+
 async function extractText(buffer, filename) {
   const ext = path.extname(filename).toLowerCase();
 
@@ -116,6 +200,10 @@ async function extractText(buffer, filename) {
     const pdfParse = require('pdf-parse');
     const data = await pdfParse(buffer);
     return data.text;
+  }
+
+  if (ext === '.xlsx' || ext === '.xls') {
+    return extractExcel(buffer);
   }
 
   return buffer.toString('utf-8');
