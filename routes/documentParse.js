@@ -26,7 +26,11 @@ function validateJapan(lat, lng) {
 }
 
 // Pattern 1 — Japanese DMS: 北緯35度41分22秒 東経139度41分30秒
-const RE_JA_DMS = /北緯\s*(\d+)\s*度\s*(\d+)\s*分\s*([\d.]+)\s*秒\s*[、,\s]*東経\s*(\d+)\s*度\s*(\d+)\s*分\s*([\d.]+)\s*秒/g;
+// Also accepts the plain 緯度/経度 labels (no 北/東 direction prefix) seen in
+// some site-guide maps, e.g. "緯度:37度23分48.32秒 経度:136度50分34.33秒" —
+// always North/East since this tool is Japan-only, same assumption as the
+// other direction-optional patterns below.
+const RE_JA_DMS = /(?:北緯|緯度)\s*[:：]?\s*(\d+)\s*度\s*(\d+)\s*分\s*([\d.]+)\s*秒\s*[、,\s]*(?:東経|経度)\s*[:：]?\s*(\d+)\s*度\s*(\d+)\s*分\s*([\d.]+)\s*秒/g;
 
 // Pattern 2 — English DMS: 35°41'22"N 139°41'30"E  (also ′ ″ variants).
 // The N/E direction letter is optional — some inspection-form PDFs print
