@@ -159,6 +159,14 @@
   .result-value.toll { color: var(--clay); }
   .result-value.none { color: #aaa; font-weight: 400; font-style: italic; }
 
+  .btn-copy-mini {
+    align-self: center; flex-shrink: 0; background: none; border: 1px solid var(--line);
+    padding: 5px 8px; font-size: 13px; cursor: pointer; border-radius: 2px;
+    color: var(--moss); line-height: 1;
+  }
+  .btn-copy-mini:hover { background: #f0ece3; }
+  .btn-copy-mini.copied { color: var(--moss-deep); border-color: var(--moss); }
+
   /* Toll road chips */
   .toll-roads-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .toll-chip {
@@ -301,6 +309,7 @@
             <div class="result-label">高速 入口 IC</div>
             <div class="result-value" id="resEntryIC">—</div>
           </div>
+          <button class="btn-copy-mini" data-copy-target="resEntryIC" title="コピー">📋</button>
         </div>
         <div class="result-row">
           <div class="result-icon">🛣</div>
@@ -308,6 +317,7 @@
             <div class="result-label">高速 出口 IC</div>
             <div class="result-value" id="resExitIC">—</div>
           </div>
+          <button class="btn-copy-mini" data-copy-target="resExitIC" title="コピー">📋</button>
         </div>
         <div class="result-row">
           <div class="result-icon">📏</div>
@@ -315,6 +325,7 @@
             <div class="result-label">距離</div>
             <div class="result-value" id="resDistance">—</div>
           </div>
+          <button class="btn-copy-mini" data-copy-target="resDistance" title="コピー">📋</button>
         </div>
         <div class="result-row">
           <div class="result-icon">⏱</div>
@@ -322,6 +333,7 @@
             <div class="result-label">所要時間</div>
             <div class="result-value" id="resDuration">—</div>
           </div>
+          <button class="btn-copy-mini" data-copy-target="resDuration" title="コピー">📋</button>
         </div>
         <div class="result-row span2">
           <div class="result-icon">💰</div>
@@ -329,6 +341,7 @@
             <div class="result-label">ETC 料金</div>
             <div class="result-value toll" id="resToll">—</div>
           </div>
+          <button class="btn-copy-mini" data-copy-target="resToll" title="コピー">📋</button>
         </div>
         <div class="result-row span2" id="tollRoadsRow" style="display:none;">
           <div class="result-icon">🗺</div>

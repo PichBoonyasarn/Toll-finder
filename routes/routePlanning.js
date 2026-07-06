@@ -97,14 +97,22 @@ function extractTollRoadNames(route) {
   return names;
 }
 
-// Looks up the nearest expressway interchange (インターチェンジ) near a coordinate
-// by: (1) reverse-geocoding to get the town/city name, then (2) Places text
-// searching "{town}インターチェンジ" near the point. Returns the first result
-// with type=intersection, or null if nothing found.
+// Looks up the nearest expressway interchange/exit near a coordinate by:
+// (1) reverse-geocoding to get the town/city name, then (2) Places text
+// searching for it near the point. Returns the first plausible match, or
+// null if nothing found.
 // Uses the Legacy Places Text Search API because the New Places API (v1) doesn't
 // index Japan expressway interchanges as distinct POIs (empirically confirmed
 // 2026-07-05 — nearbysearch with includedTypes returns nothing).
-async function findNearestIC(lat, lng, apiKey) {
+//
+// Entries and exits use different naming conventions in Japan: entrances are
+// always "◯◯インターチェンジ"/"◯◯IC", while exits are named "◯◯出口" — a
+// completely different word. Searching only "インターチェンジ" for an exit
+// point (the original behavior) means Google Places is being asked for the
+// wrong term entirely and will legitimately find nothing, even though the
+// exit is indexed under its real "出口" name. Try the term matching `kind`
+// first, then fall back to the other in case a location is labeled unusually.
+async function findNearestIC(lat, lng, apiKey, kind = 'entry') {
   if (lat == null || lng == null) return null;
   try {
     const geoRes = await fetch(
@@ -120,13 +128,23 @@ async function findNearestIC(lat, lng, apiKey) {
     if (!town) return null;
     const townName = town.long_name.replace(/[市郡町村]$/, '');
 
-    const q = encodeURIComponent(townName + ' インターチェンジ');
-    const placeRes = await fetch(
-      `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${q}&location=${lat},${lng}&radius=10000&key=${apiKey}&language=ja`
-    );
-    const placeJson = await placeRes.json();
-    const ic = (placeJson.results || []).find(r => r.types?.includes('intersection'));
-    return ic?.name ?? null;
+    const suffixes = kind === 'exit' ? ['出口', 'インターチェンジ'] : ['インターチェンジ', '出口'];
+
+    for (const suffix of suffixes) {
+      const q = encodeURIComponent(`${townName} ${suffix}`);
+      const placeRes = await fetch(
+        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${q}&location=${lat},${lng}&radius=10000&key=${apiKey}&language=ja`
+      );
+      const placeJson = await placeRes.json();
+      const candidates = placeJson.results || [];
+      // Prefer Google's own intersection tag, but many real IC/exit POIs
+      // aren't tagged that way — a name match on the expected term is a
+      // reasonable fallback rather than requiring the tag.
+      const match = candidates.find(r => r.types?.includes('intersection'))
+        || candidates.find(r => /出口|インターチェンジ|IC/.test(r.name || ''));
+      if (match) return match.name;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -159,8 +177,8 @@ async function extractICs(route, apiKey) {
 
   // Run both IC lookups in parallel to minimise latency.
   const [entryIC, exitICFromSearch] = await Promise.all([
-    findNearestIC(entryLat, entryLng, apiKey),
-    exitNameFromText ? Promise.resolve(null) : findNearestIC(exitLat, exitLng, apiKey),
+    findNearestIC(entryLat, entryLng, apiKey, 'entry'),
+    exitNameFromText ? Promise.resolve(null) : findNearestIC(exitLat, exitLng, apiKey, 'exit'),
   ]);
 
   const exitIC = exitNameFromText || exitICFromSearch;

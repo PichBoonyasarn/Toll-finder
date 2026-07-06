@@ -71,6 +71,14 @@ function toggleField(prefix) {
 
 // ── Copy-ready result line ──────────────────────────────────────────────────────
 
+function copyWithFeedback(btn, text, idleLabel, copiedLabel) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = copiedLabel;
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = idleLabel; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
 function buildCopyLine(data, entryText, exitText, distanceText, durationText, tollText) {
   return [
     `距離 ${distanceText}`,
@@ -112,7 +120,7 @@ function renderMap(data, fromPos, toPos, fromLabel, toLabel) {
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: true,
-      gestureHandling: 'cooperative',
+      gestureHandling: 'greedy',
     });
   }
   clearOverlays();
@@ -374,10 +382,13 @@ async function initApp() {
 
   document.getElementById('copyBtn').addEventListener('click', () => {
     const btn = document.getElementById('copyBtn');
-    navigator.clipboard.writeText(document.getElementById('copyText').textContent).then(() => {
-      btn.textContent = '✓ コピーしました';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = '📋 コピー'; btn.classList.remove('copied'); }, 1500);
+    copyWithFeedback(btn, document.getElementById('copyText').textContent, '📋 コピー', '✓ コピーしました');
+  });
+
+  document.querySelectorAll('.btn-copy-mini').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = document.getElementById(btn.dataset.copyTarget).textContent;
+      copyWithFeedback(btn, text, '📋', '✓');
     });
   });
 
